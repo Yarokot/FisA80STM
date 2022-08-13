@@ -50,6 +50,8 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -62,6 +64,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
@@ -69,11 +72,14 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
 int x=1;
 int y=1;
 int z=1;
-int p=1;
-
+int p=4;
+static uint16_t LastTimerCounter = 0;
+static uint16_t MenuLastTimerCounter = 0;
 
 int door=0;
 int door2=0;
@@ -320,18 +326,18 @@ void img()
 {
 	if(y==1)
 	{
-		ST7735_FillScreen(ST7735_BLACK);
+		//ST7735_FillScreen(ST7735_BLACK);
 		ST7735_DrawImage(0, 0, 128, 128, (uint16_t*)test_img_128x128);
 		y=0;
 	}
 	if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
 	    {
-	    	if (x==3)
-	    	{
+	    	//if (x==3)
+	    	//{
 	    		x=2;
-	    	}
+	    	//}
 	    	y=1;
-	    	HAL_Delay(20);
+	    	HAL_Delay(50);
 	    }
 }
 
@@ -340,7 +346,7 @@ void MainScreen()
 	int i;
 	int d;
 	int f;
-	int c=1;
+	int c;
 
 	char a[7];
 	if(y==1)
@@ -359,8 +365,24 @@ void MainScreen()
 			}
 		//f=10*z;
 		//frame(60, 50, f, f, ST7735_RED);
+		LastTimerCounter=htim1.Instance->CNT;
+		c=1;
 		y=0;
 	}
+
+
+		int TimerDif = htim1.Instance->CNT - LastTimerCounter;
+		if(TimerDif >= 4 || TimerDif <= -4)
+		{
+			TimerDif /= 4;
+			p += (int8_t)TimerDif;
+			if(p > 10) p = 10;
+			if(p < 0) p = 0;
+			LastTimerCounter = htim1.Instance->CNT;
+			c=1;
+		}
+
+
 	if (p<10)
 	{
 		ST7735_FillRectangle(70, 26, 12, 14, ST7735_BLACK);
@@ -373,21 +395,7 @@ void MainScreen()
 	ST7735_WriteString(60, 25, a, Font_11x18, ST7735_RED, ST7735_BLACK);
 
 
-	if (HAL_GPIO_ReadPin(UP_GPIO_Port, UP_Pin) == GPIO_PIN_RESET && p<10)
-		{
-			c=1;
-			p++;
-			while(HAL_GPIO_ReadPin(UP_GPIO_Port, UP_Pin) == GPIO_PIN_RESET);
-			HAL_Delay(20);
-		}
 
-	if (HAL_GPIO_ReadPin(DOWN_GPIO_Port, DOWN_Pin) == GPIO_PIN_RESET && p>1)
-		{
-			c=1;
-			p--;
-			while(HAL_GPIO_ReadPin(DOWN_GPIO_Port, DOWN_Pin) == GPIO_PIN_RESET);
-			HAL_Delay(20);
-		}
 	if (c==1) //Poziom paliwa
 	{
 		f=10*p;
@@ -420,34 +428,25 @@ void Menu()
 			ST7735_WriteString(5, 45, "Ustawienia", Font_11x18, ST7735_RED, ST7735_BLACK);
 			ST7735_WriteString(5, 65, "Obrazek", Font_11x18, ST7735_RED, ST7735_BLACK);
 			ST7735_WriteString(5, 85, "Ekran gl.", Font_11x18, ST7735_RED, ST7735_BLACK);
+			MenuLastTimerCounter=htim1.Instance->CNT;
+			m=1;
+			z=1;
 			y=0;
-			m=1;
-		}
-	/*if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-		{
-		   	if (x==2)
-		   	{
-		   		x=1;
-		   	}
-		   	y=1;
-		   	HAL_Delay(20);
-		}*/
 
-	if (HAL_GPIO_ReadPin(UP_GPIO_Port, UP_Pin) == GPIO_PIN_RESET)
-		{
-			HAL_Delay(20);
-			z++;
-			m=1;
-			while(HAL_GPIO_ReadPin(UP_GPIO_Port, UP_Pin) == GPIO_PIN_RESET);
 		}
 
-	if (HAL_GPIO_ReadPin(DOWN_GPIO_Port, DOWN_Pin) == GPIO_PIN_RESET)
-		{
-			HAL_Delay(20);
-			z--;
-			m=1;
-			while(HAL_GPIO_ReadPin(DOWN_GPIO_Port, DOWN_Pin) == GPIO_PIN_RESET);
-		}
+
+
+			int TimerDif = htim1.Instance->CNT - MenuLastTimerCounter;
+			if(TimerDif >= 4 || TimerDif <= -4)
+			{
+				TimerDif /= 4;
+				z += (int8_t)TimerDif;
+				if(z > 4) z = 4;
+				if(z < 1) z = 1;
+				m=1;
+				MenuLastTimerCounter = htim1.Instance->CNT;
+			}
 	switch (z)
 	    {
 	    	case 1:			//Diagnostyka
@@ -694,8 +693,9 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_ALL);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -795,6 +795,56 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_Encoder_InitTypeDef sConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
+  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC1Filter = 15;
+  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
+  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
+  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
+  sConfig.IC2Filter = 15;
+  if (HAL_TIM_Encoder_Init(&htim1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -846,22 +896,13 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : DOWN_Pin */
-  GPIO_InitStruct.Pin = DOWN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(DOWN_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RRDoor_Pin LRDoor_Pin LFDoor_Pin RFDoor_Pin */
   GPIO_InitStruct.Pin = RRDoor_Pin|LRDoor_Pin|LFDoor_Pin|RFDoor_Pin;
@@ -876,21 +917,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : UP_Pin */
-  GPIO_InitStruct.Pin = UP_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(UP_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_9;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PB6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  /*Configure GPIO pins : PB6 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

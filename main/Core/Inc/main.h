@@ -63,14 +63,10 @@ void Error_Handler(void);
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
-#define DOWN_Pin GPIO_PIN_10
-#define DOWN_GPIO_Port GPIOB
 #define RRDoor_Pin GPIO_PIN_12
 #define RRDoor_GPIO_Port GPIOB
 #define LRDoor_Pin GPIO_PIN_14
 #define LRDoor_GPIO_Port GPIOB
-#define UP_Pin GPIO_PIN_8
-#define UP_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
